@@ -1100,9 +1100,9 @@ This is a 3-person team. Work is parallelized across the backend/AI pipeline, th
 
 | Team Member | Primary Focus |
 |---|---|
-| *[Name — to be added]* | Backend: Incident/Evidence services, database schema, API endpoints |
-| *[Name — to be added]* | AI & Sandbox: Context Engine, LLM Orchestrator, Patch Generator, Sandbox Worker, Verification Engine |
-| *[Name — to be added]* | Frontend/Phone: PWA, capture flow (camera/OCR/mic), approval UI, notifications |
+| *Likith R* | Backend: Incident/Evidence services, database schema, API endpoints |
+| *Anuka* | AI & Sandbox: Context Engine, LLM Orchestrator, Patch Generator, Sandbox Worker, Verification Engine |
+| *Tejas V* | Frontend/Phone: PWA, capture flow (camera/OCR/mic), approval UI, notifications |
 
 > Team member names were not included in the provided project sources and are left as placeholders here rather than invented. Replace the placeholders above with actual names and roles before publishing.
 
