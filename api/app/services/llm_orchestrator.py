@@ -1,41 +1,66 @@
-import os
 import json
-from api.app.config import DEMO_REPO_PATH
+import os
+import shutil
+import subprocess
+import tempfile
 
-# This mock returns a deterministic "patch" for the demo app.
-def produce_mock_investigation(incident, repo_path=DEMO_REPO_PATH):
+from api.app.config import DEMO_REPO_PATH, WORKSPACE_DIR
+
+def run_sandbox_for_investigation(investigation):
     """
-    For the demo we return:
-    - root_cause: short string
-    - affected_files: list of paths relative to repo root
-    - path_file: path under data/workspaces/... where we will write the patch data(for bokkeeping)
-    - patch_preview: short preview string to show in UI
-    - patch_content: dict { "target_files": path, "new_content": "..."}
+    Demo sandbox:
+    - load patch file for this investigation
+    - copy demo repo into temporary workspace
+    - overwrite target file
+    - run pytest
+    - return (status, logs_path, logs_text)
     """
+    if not investigation.patch_file or not os.path.exists(investigation.patch_file):
+        return ("ERROR", None, "No patch file found for investigation")
 
-    # For simplicity, read demos/demo-app/fix/new_app_py.txt as the new file content
-    fix_path = os.path.join(repo_path, "fix", "new_app_py.txt")
-    with open(fix_path, "r", encoding="utf-8") as fh:
-        new_content = fh.read()
+    with open(investigation.patch_file, "r", encoding="utf-8") as fh:
+        patch = json.load(fh)
 
-    patch_files = {
-        "target_file": "app.py"
-        "new_content": new_content
-    }
+    ws_parent = WORKSPACE_DIR
+    os.makedirs(ws_parent, exist_ok=True)
+    tmpdir = tempfile.mkdtemp(prefix="workspace_", dir=ws_parent)
 
-    # write patch json to a file a so sand_box can find can find it via Investigaton.path_file
-    import tempfile, os
-    base = os.environ.get("WORKSPACE_DIR") or os.path.join(os.path.dirname(__file__),"..","..","data", "workspaces")
-    os.mkdirs(base, exist_ok=True)
-    path_file = os.path.join(base, f"patch_incident_{incident.id}.json")
-    with open(path_file, "w", encoding="utf-8") as fh:
-        json.dump(patch_content, fh)
+    repo_copy = os.path.join(tmpdir, "repo")
+    shutil.copytree(DEMO_REPO_PATH, repo_copy, dirs_exist_ok=True)
 
-    preview = f"Replace {patch_content['target_file']} with fixed version (preview first 200 chars):\n\n" + new_content[:200]
-    return {
-        "root_cause": "off-by-one logic in the function causing test to return wrong value",
-        "affected_files": [patch_content["target_file"]],
-        "patch_file": patch_files,
-        "patch_preview": preview,
-        "patch_content": patch_content
-    }
+    target_rel = patch["target_file"]
+    target_abs = os.path.join(repo_copy, target_rel)
+    os.makedirs(os.path.dirname(target_abs), exist_ok=True)
+
+    with open(target_abs, "w", encoding="utf-8") as fh:
+        fh.write(patch["new_content"])
+
+    cmd = ["pytest", "-q"]
+    proc = subprocess.Popen(
+        cmd,
+        cwd=repo_copy,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    try:
+        out, _ = proc.communicate(timeout=60)
+        exit_code = proc.returncode
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        out = "Sandbox timed out"
+        exit_code = 124
+
+    logs_path = os.path.join(tmpdir, "sandbox_logs.txt")
+    with open(logs_path, "w", encoding="utf-8") as fh:
+        fh.write(out)
+
+    if exit_code == 0:
+        status = "VERIFIED"
+    elif exit_code == 124:
+        status = "TIMEOUT"
+    else:
+        status = "FAILED"
+
+    return status, logs_path, out

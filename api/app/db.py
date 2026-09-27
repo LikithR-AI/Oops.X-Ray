@@ -1,8 +1,8 @@
-from sqlmodel import create_engine, SQLModel, Session
 import os
+from sqlmodel import SQLModel, Session, create_engine
 
 DB_URL = os.environ.get("DATABASE_URL", "sqlite:///./data/db.sqlite")
-engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread":False})
+engine = create_engine(DB_URL, echo=False, connect_args={"check_same_thread": False})
 
 def init_db():
     from api.app import models
